@@ -11,6 +11,12 @@ const ENV_NAMES = Object.freeze({
   password: "OMADA_PASSWORD"
 });
 
+const OMADA_CLOUD_OPENAPI_HOSTS = Object.freeze({
+  aps1: "https://aps1-omada-northbound.tplinkcloud.com",
+  use1: "https://use1-omada-northbound.tplinkcloud.com",
+  euw1: "https://euw1-omada-northbound.tplinkcloud.com"
+});
+
 function parseBoolean(value, defaultValue) {
   if (value == null || value === "") {
     return defaultValue;
@@ -45,6 +51,74 @@ function normalizeBaseUrl(rawValue) {
   return rawValue.trim().replace(/\/+$/, "");
 }
 
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function getCloudOpenApiUrls(region, explicitUrl) {
+  const normalizedExplicit = normalizeBaseUrl(explicitUrl);
+
+  if (normalizedExplicit) {
+    return [normalizedExplicit];
+  }
+
+  const normalizedRegion = String(region || "auto").trim().toLowerCase();
+
+  if (OMADA_CLOUD_OPENAPI_HOSTS[normalizedRegion]) {
+    return [OMADA_CLOUD_OPENAPI_HOSTS[normalizedRegion]];
+  }
+
+  return [
+    OMADA_CLOUD_OPENAPI_HOSTS.aps1,
+    OMADA_CLOUD_OPENAPI_HOSTS.use1,
+    OMADA_CLOUD_OPENAPI_HOSTS.euw1
+  ];
+}
+
+function isPrivateControllerUrl(rawValue) {
+  const normalized = normalizeBaseUrl(rawValue);
+
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    const hostname = new URL(normalized).hostname.toLowerCase();
+
+    if (hostname === "localhost" || hostname === "::1") {
+      return true;
+    }
+
+    if (/^127\./.test(hostname) || /^10\./.test(hostname) || /^192\.168\./.test(hostname)) {
+      return true;
+    }
+
+    const match172 = hostname.match(/^172\.(\d{1,2})\./);
+
+    if (match172) {
+      const secondOctet = Number(match172[1]);
+      return secondOctet >= 16 && secondOctet <= 31;
+    }
+
+    return hostname.endsWith(".local");
+  } catch (error) {
+    return false;
+  }
+}
+
+function resolveControllerUrls(env = process.env) {
+  const localControllerUrl = normalizeBaseUrl(env.OMADA_CONTROLLER_URL);
+  const cloudUrls = getCloudOpenApiUrls(env.OMADA_CLOUD_REGION, env.OMADA_CLOUD_CONTROLLER_URL);
+  const shouldUseCloud =
+    parseBoolean(env.OMADA_USE_CLOUD_OPENAPI, Boolean(env.VERCEL) && isPrivateControllerUrl(localControllerUrl));
+
+  if (shouldUseCloud) {
+    return uniqueValues([...cloudUrls, ...(isPrivateControllerUrl(localControllerUrl) ? [] : [localControllerUrl])]);
+  }
+
+  return uniqueValues([localControllerUrl]);
+}
+
 function normalizeAuthMode(rawValue) {
   const value = String(rawValue || "client_credentials").trim().toLowerCase();
 
@@ -55,9 +129,11 @@ function normalizeAuthMode(rawValue) {
   return "client_credentials";
 }
 
+const controllerUrls = resolveControllerUrls(process.env);
 const config = Object.freeze({
   port: parseInteger(process.env.PORT, 3000, { min: 1, max: 65535 }),
-  controllerUrl: normalizeBaseUrl(process.env.OMADA_CONTROLLER_URL),
+  controllerUrl: controllerUrls[0] || "",
+  controllerUrls,
   omadaId: String(process.env.OMADA_ID || "").trim(),
   clientId: String(process.env.OMADA_CLIENT_ID || "").trim(),
   clientSecret: String(process.env.OMADA_CLIENT_SECRET || "").trim(),
@@ -97,7 +173,10 @@ function getMissingConfig(overrides = {}) {
 }
 
 module.exports = {
+  OMADA_CLOUD_OPENAPI_HOSTS,
   config,
   getMissingConfig,
+  isPrivateControllerUrl,
+  resolveControllerUrls,
   normalizeAuthMode
 };

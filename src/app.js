@@ -239,7 +239,7 @@ function resolveStatusCode(error) {
     return 403;
   }
 
-  if ([-33000, -33004].includes(error.code)) {
+  if ([-7131, -33000, -33004].includes(error.code)) {
     return 502;
   }
 
