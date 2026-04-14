@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/png" href="/hotspotlogo/HOTSPOT%20LOGO.png" />
+    <link rel="shortcut icon" type="image/png" href="/hotspotlogo/HOTSPOT%20LOGO.png" />
+    <title>Wi-Fi Voucher Status</title>
+    <script>
+      (() => {
+        try {
+          const key = "voucher-ui-theme";
+          const saved = localStorage.getItem(key);
+          const resolved = saved === "dark" || saved === "light"
+            ? saved
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.style.colorScheme = resolved;
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", resolved === "dark" ? "#071120" : "#ffffff");
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+          document.documentElement.style.colorScheme = "light";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#voucher-form">Skip to voucher search</a>
+
+    <main class="app-shell">
+      <div class="card">
+        <!-- Header -->
+        <div class="card-header">
+          <p id="hero-ssid" class="hero-ssid hero-ssid-hidden" aria-live="polite"></p>
+        </div>
+
+        <!-- Search Form -->
+        <form id="voucher-form" class="search-form">
+          <div class="search-row">
+            <button type="button" id="speedtest-reload-btn" class="speedtest-toolbar-button" data-speedtest-action="load-speedtest" hidden>Reload</button>
+            <div class="search-logo-shell" aria-hidden="true">
+              <img class="search-logo" src="/hotspotlogo/HOTSPOT%20LOGO.png" alt="" />
+            </div>
+            <div class="search-input-shell">
+              <input
+                type="text"
+                id="code"
+                name="code"
+                placeholder="Enter voucher code"
+                autocomplete="one-time-code"
+                autocapitalize="characters"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="search"
+                required
+              />
+              <span class="search-input-status" aria-hidden="true">
+                <span class="search-input-radar">
+                  <span class="search-input-radar-core"></span>
+                  <span class="search-input-radar-wave search-input-radar-wave-a"></span>
+                  <span class="search-input-radar-wave search-input-radar-wave-b"></span>
+                </span>
+                <span class="search-input-status-text">Checking</span>
+              </span>
+            </div>
+            <button type="submit" id="search-btn">Check</button>
+            <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+              <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="4.2"></circle>
+                  <path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.6 5.4l-1.7 1.7M7.1 16.9l-1.7 1.7M18.6 18.6l-1.7-1.7M7.1 7.1 5.4 5.4"></path>
+                </svg>
+              </span>
+              <span class="theme-toggle-icon theme-toggle-icon-moon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.7 8.7 0 1 0 11.2 11.2Z"></path>
+                </svg>
+              </span>
+            </button>
+            <button type="button" id="speedtest-close-btn" class="speedtest-toolbar-button speedtest-toolbar-button-secondary" data-speedtest-action="close-speedtest" hidden>Close</button>
+          </div>
+        </form>
+
+        <!-- Dynamic Result Body -->
+        <div id="result-body" class="result-body">
+          <div class="empty-state"></div>
+        </div>
+
+        <!-- Speed Test Panel (hidden by default) -->
+        <section id="speedtest-panel" class="speedtest-panel speedtest-panel-hidden" aria-live="polite"></section>
+      </div>
+    </main>
+
+    <!-- Banner (hidden, used for screen reader announcements) -->
+    <div id="status-banner" class="sr-only" role="status" aria-live="polite"></div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
