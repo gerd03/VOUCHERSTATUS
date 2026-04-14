@@ -8,6 +8,17 @@ const STATUS_LABELS = Object.freeze({
 });
 
 const AUTH_TYPE_VOUCHER = 3;
+const NETWORK_ERROR_CODES = new Set([
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "ERR_NETWORK"
+]);
 
 class OmadaApiError extends Error {
   constructor(message, code, details) {
@@ -227,6 +238,16 @@ class OmadaClient {
 
     if (payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "errorCode")) {
       return new OmadaApiError(payload.msg || "Omada API request failed.", payload.errorCode, payload);
+    }
+
+    if (isNetworkError(error)) {
+      return new OmadaApiError(
+        "Omada controller is not reachable from this server. Check OMADA_CONTROLLER_URL and make sure the deployed app can access the controller.",
+        502,
+        {
+          reason: error.code || "NETWORK_ERROR"
+        }
+      );
     }
 
     return new OmadaApiError(
@@ -803,6 +824,18 @@ function normalizeClient(client) {
 
 function normalizeClientMac(value) {
   return String(value || "").trim().toUpperCase();
+}
+
+function isNetworkError(error) {
+  if (!error || error.response) {
+    return false;
+  }
+
+  if (NETWORK_ERROR_CODES.has(error.code)) {
+    return true;
+  }
+
+  return Boolean(error.request && !error.response);
 }
 
 function deriveClientBandLabel(client = {}) {

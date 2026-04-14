@@ -19,8 +19,8 @@ const testConfig = {
   speedTestEmbedUrl: "https://fast.com/"
 };
 
-async function startTestServer(t) {
-  const server = http.createServer(createApp(testConfig));
+async function startTestServer(t, config = testConfig) {
+  const server = http.createServer(createApp(config));
 
   await new Promise((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
@@ -49,4 +49,22 @@ test("unknown API routes still return 404 instead of the app shell", async (t) =
   const response = await fetch(`${baseUrl}/api/missing-route`);
 
   assert.equal(response.status, 404);
+});
+
+test("unreachable Omada controller returns a clear gateway error", async (t) => {
+  const baseUrl = await startTestServer(t, {
+    ...testConfig,
+    controllerUrl: "http://127.0.0.1:1",
+    omadaId: "test-omada-id",
+    clientId: "test-client-id",
+    clientSecret: "test-client-secret",
+    requestTimeoutMs: 500
+  });
+
+  const response = await fetch(`${baseUrl}/api/voucher-status?code=449380`);
+  const body = await response.json();
+
+  assert.equal(response.status, 502);
+  assert.equal(body.ok, false);
+  assert.match(body.error, /not reachable/);
 });

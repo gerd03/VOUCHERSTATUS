@@ -183,7 +183,7 @@ async function lookupVoucherStatus(query, config, omadaClient) {
 }
 
 async function ensureVoucherLookupRequest(query, config) {
-  const missing = getMissingConfig({ authMode: config.authMode });
+  const missing = getMissingConfig(config);
 
   if (missing.length) {
     throw new OmadaApiError("Missing required Omada client checker configuration.", 400, {
@@ -227,20 +227,8 @@ function firstValue(...values) {
 }
 
 function resolveStatusCode(error) {
-  if (error.code === 400) {
-    return 400;
-  }
-
-  if (error.code === 403) {
-    return 403;
-  }
-
-  if (error.code === 404) {
-    return 404;
-  }
-
-  if (error.code === 409) {
-    return 409;
+  if ([400, 401, 403, 404, 409, 500, 502, 503, 504].includes(error.code)) {
+    return error.code;
   }
 
   if ([-44106, -44111, -44112, -44113].includes(error.code)) {
