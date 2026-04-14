@@ -33,34 +33,16 @@ class OmadaClient {
   constructor(config) {
     this.config = config;
     this.tokenState = null;
-    this.controllerUrls = Array.isArray(config.controllerUrls) && config.controllerUrls.length
-      ? config.controllerUrls
-      : [config.controllerUrl].filter(Boolean);
-    this.activeControllerUrl = this.controllerUrls[0] || "";
-    this.http = this.createHttpClient(this.activeControllerUrl);
-  }
-
-  createHttpClient(controllerUrl) {
-    return axios.create({
-      baseURL: controllerUrl,
-      timeout: this.config.requestTimeoutMs,
+    this.http = axios.create({
+      baseURL: config.controllerUrl,
+      timeout: config.requestTimeoutMs,
       httpsAgent: new https.Agent({
-        rejectUnauthorized: !this.config.insecureTls
+        rejectUnauthorized: !config.insecureTls
       }),
       headers: {
         "Content-Type": "application/json"
       }
     });
-  }
-
-  setActiveControllerUrl(controllerUrl) {
-    if (controllerUrl === this.activeControllerUrl) {
-      return;
-    }
-
-    this.activeControllerUrl = controllerUrl;
-    this.http = this.createHttpClient(controllerUrl);
-    this.tokenState = null;
   }
 
   async ensureAccessToken() {
@@ -198,45 +180,19 @@ class OmadaClient {
   }
 
   async requestAuth(method, path, { params, data, headers } = {}) {
-    const controllerUrls = this.getControllerAttemptOrder();
-    const errors = [];
+    try {
+      const response = await this.http.request({
+        method,
+        url: path,
+        params,
+        data,
+        headers
+      });
 
-    for (const controllerUrl of controllerUrls) {
-      this.setActiveControllerUrl(controllerUrl);
-
-      try {
-        const response = await this.http.request({
-          method,
-          url: path,
-          params,
-          data,
-          headers
-        });
-
-        return this.unwrapEnvelope(response.data);
-      } catch (error) {
-        const normalized = this.normalizeError(error);
-
-        errors.push({
-          controllerUrl,
-          code: normalized.code,
-          error: normalized.message
-        });
-
-        if (!shouldTryNextController(normalized) || controllerUrls.length === errors.length) {
-          throw buildControllerSelectionError(errors, normalized);
-        }
-      }
+      return this.unwrapEnvelope(response.data);
+    } catch (error) {
+      throw this.normalizeError(error);
     }
-
-    throw buildControllerSelectionError(errors, null);
-  }
-
-  getControllerAttemptOrder() {
-    return [
-      this.activeControllerUrl,
-      ...this.controllerUrls.filter((controllerUrl) => controllerUrl !== this.activeControllerUrl)
-    ].filter(Boolean);
   }
 
   async recoverAuthentication() {
@@ -880,64 +836,6 @@ function isNetworkError(error) {
   }
 
   return Boolean(error.request && !error.response);
-}
-
-function shouldTryNextController(error) {
-  return [502, 404, -7131, -44106, -44111, -44112, -44113, -33000, -33004].includes(error?.code);
-}
-
-function buildControllerSelectionError(errors, fallbackError) {
-  if (!errors.length) {
-    return fallbackError || new OmadaApiError("Omada OpenAPI request failed.", 502, null);
-  }
-
-  if (errors.length === 1) {
-    return fallbackError || new OmadaApiError(errors[0].error, errors[0].code, null);
-  }
-
-  const attempts = errors.map((entry) => ({
-    controllerUrl: sanitizeControllerUrlForError(entry.controllerUrl),
-    code: entry.code,
-    error: entry.error
-  }));
-
-  return new OmadaApiError(
-    "Unable to connect to Omada OpenAPI. Check the Interface Access Address from Omada Platform Integration, or set OMADA_CLOUD_REGION/OMADA_CLOUD_CONTROLLER_URL for cloud deployment.",
-    502,
-    { attempts }
-  );
-}
-
-function sanitizeControllerUrlForError(controllerUrl) {
-  try {
-    const url = new URL(controllerUrl);
-    const hostname = url.hostname.toLowerCase();
-
-    if (
-      hostname === "localhost" ||
-      hostname === "::1" ||
-      /^127\./.test(hostname) ||
-      /^10\./.test(hostname) ||
-      /^192\.168\./.test(hostname) ||
-      hostname.endsWith(".local")
-    ) {
-      return `${url.protocol}//private-controller`;
-    }
-
-    const match172 = hostname.match(/^172\.(\d{1,2})\./);
-
-    if (match172) {
-      const secondOctet = Number(match172[1]);
-
-      if (secondOctet >= 16 && secondOctet <= 31) {
-        return `${url.protocol}//private-controller`;
-      }
-    }
-
-    return `${url.protocol}//${url.host}`;
-  } catch (error) {
-    return "configured-controller";
-  }
 }
 
 function deriveClientBandLabel(client = {}) {

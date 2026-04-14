@@ -5,11 +5,9 @@ function loadConfigWithEnv(env) {
   const configPath = require.resolve("../src/config");
   const previousEnv = {};
   const keys = [
-    "VERCEL",
+    "HOST",
     "OMADA_CONTROLLER_URL",
-    "OMADA_CLOUD_REGION",
-    "OMADA_CLOUD_CONTROLLER_URL",
-    "OMADA_USE_CLOUD_OPENAPI"
+    "OMADA_AUTH_MODE"
   ];
 
   for (const key of keys) {
@@ -36,23 +34,27 @@ function loadConfigWithEnv(env) {
   return loaded;
 }
 
-test("Vercel deployment uses cloud OpenAPI when controller URL is private", () => {
+test("configuration keeps the local OC200 controller URL", () => {
   const { config } = loadConfigWithEnv({
-    VERCEL: "1",
-    OMADA_CONTROLLER_URL: "https://192.168.1.50:443",
-    OMADA_CLOUD_REGION: "aps1"
-  });
-
-  assert.equal(config.controllerUrl, "https://aps1-omada-northbound.tplinkcloud.com");
-  assert.deepEqual(config.controllerUrls, ["https://aps1-omada-northbound.tplinkcloud.com"]);
-});
-
-test("local development keeps the configured private controller URL", () => {
-  const { config } = loadConfigWithEnv({
-    OMADA_CONTROLLER_URL: "https://192.168.1.50:443",
-    OMADA_CLOUD_REGION: "aps1"
+    OMADA_CONTROLLER_URL: "https://192.168.1.50:443"
   });
 
   assert.equal(config.controllerUrl, "https://192.168.1.50:443");
-  assert.deepEqual(config.controllerUrls, ["https://192.168.1.50:443"]);
+});
+
+test("configuration binds to all interfaces by default for same-LAN access", () => {
+  const { config } = loadConfigWithEnv({
+    OMADA_CONTROLLER_URL: "https://192.168.1.50:443"
+  });
+
+  assert.equal(config.host, "0.0.0.0");
+});
+
+test("configuration allows overriding host for locked-down local installs", () => {
+  const { config } = loadConfigWithEnv({
+    HOST: "127.0.0.1",
+    OMADA_CONTROLLER_URL: "https://192.168.1.50:443"
+  });
+
+  assert.equal(config.host, "127.0.0.1");
 });

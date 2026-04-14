@@ -1,6 +1,6 @@
 # Omada Voucher Status Checker
 
-Node.js + Express app for checking TP-Link Omada hotspot voucher status from a public browser page. A customer enters one voucher code, and the app asks Omada OpenAPI for that voucher plus matching client usage history.
+Node.js + Express app for checking TP-Link Omada hotspot voucher status from a browser page on the same local network as the OC200/controller. A customer enters one voucher code, and the app asks Omada OpenAPI for that voucher plus matching client usage history.
 
 The dashboard can show:
 
@@ -52,7 +52,21 @@ Minimum required config for client-credentials mode:
 
 ```env
 PORT=3000
-OMADA_CONTROLLER_URL=https://YOUR_CONTROLLER_OPENAPI_ADDRESS
+HOST=0.0.0.0
+OMADA_CONTROLLER_URL=https://YOUR_OC200_LAN_OPENAPI_ADDRESS
+OMADA_ID=your-omada-id
+OMADA_CLIENT_ID=your-client-id
+OMADA_CLIENT_SECRET=your-client-secret
+OMADA_AUTH_MODE=client_credentials
+OMADA_INSECURE_TLS=true
+```
+
+Example for a local OC200:
+
+```env
+PORT=3000
+HOST=0.0.0.0
+OMADA_CONTROLLER_URL=https://192.168.1.50:443
 OMADA_ID=your-omada-id
 OMADA_CLIENT_ID=your-client-id
 OMADA_CLIENT_SECRET=your-client-secret
@@ -72,50 +86,27 @@ npm start
 http://localhost:3000
 ```
 
+From a phone or other device on the same Wi-Fi/LAN, open the server computer's LAN IP:
+
+```text
+http://YOUR_SERVER_LAN_IP:3000
+```
+
+On Windows, run `ipconfig` on the server computer and use the IPv4 address from the active Wi-Fi/Ethernet adapter. Keep the server computer on, and allow port `3000` through Windows Firewall if another device cannot open the page.
+
 For development with auto-restart:
 
 ```bash
 npm run dev
 ```
 
-## Vercel Deployment
+## Local Network Setup
 
-This repo includes `vercel.json` so Vercel sends every request to the Express app in `src/server.js`.
+This setup is for an OC200/controller on your LAN, for example `https://192.168.1.50:443`.
 
-That matters for browser refreshes: if a visitor refreshes an extensionless page route such as `/voucher/status/554339`, Express falls back to `public/index.html` instead of returning a Vercel 404 page. API routes under `/api/...` are not caught by this fallback, so missing API routes still return 404 normally.
+Users can access the voucher checker when they are connected to the same Wi-Fi/LAN as the computer or mini-PC running this Node app. The browser connects to this app at `http://YOUR_SERVER_LAN_IP:3000`; this app then talks to the OC200 through `OMADA_CONTROLLER_URL`.
 
-For Omada Cloud/OpenAPI, do not point Vercel at a LAN-only address such as `https://192.168.1.50:443`. Vercel is outside your local network and cannot reach that IP. Use the Interface Access Address shown in Omada Global View -> Settings -> Platform Integration -> Open API. For Omada Cloud, it usually looks like one of these northbound hosts:
-
-```text
-https://aps1-omada-northbound.tplinkcloud.com
-https://use1-omada-northbound.tplinkcloud.com
-https://euw1-omada-northbound.tplinkcloud.com
-```
-
-If `OMADA_CONTROLLER_URL` is still a private IP and Vercel sets `VERCEL=1`, the app will automatically try the cloud northbound hosts. You can make it explicit with:
-
-```env
-OMADA_USE_CLOUD_OPENAPI=true
-OMADA_CLOUD_REGION=aps1
-```
-
-Or use the exact Interface Access Address:
-
-```env
-OMADA_CLOUD_CONTROLLER_URL=https://aps1-omada-northbound.tplinkcloud.com
-```
-
-Set these values in Vercel Project Settings -> Environment Variables:
-
-- `OMADA_CONTROLLER_URL`
-- `OMADA_ID`
-- `OMADA_CLIENT_ID`
-- `OMADA_CLIENT_SECRET`
-- `OMADA_AUTH_MODE`
-- `OMADA_INSECURE_TLS`
-- Optional: `OMADA_USE_CLOUD_OPENAPI`, `OMADA_CLOUD_REGION`, `OMADA_CLOUD_CONTROLLER_URL`, `OMADA_SITE_ID`, `OMADA_SITE_NAME`, `OMADA_VOUCHER_GROUP_ID`, `OMADA_VOUCHER_GROUP_NAME`, `OMADA_PAGE_SIZE`, `OMADA_TIMEOUT_MS`, `SPEEDTEST_EMBED_URL`
-
-Do not upload `.env` to Vercel or GitHub. Use Vercel environment variables instead.
+Vercel is not needed for this setup. If the controller URL is a private LAN IP like `192.168.x.x`, Vercel cannot reach it because Vercel runs outside your network. Use Vercel only when the controller API is reachable from Vercel through a public URL, VPN, or tunnel.
 
 ## Environment Variables
 
@@ -138,6 +129,9 @@ Common optional values:
 - `PORT`
   Local server port. Default: `3000`.
 
+- `HOST`
+  Server bind address. Default: `0.0.0.0` so phones and other devices on the same LAN can open the app by using the server computer's LAN IP.
+
 - `OMADA_AUTH_MODE`
   Default: `client_credentials`. Use `authorization_code` only if your Omada app is configured for that mode.
 
@@ -146,15 +140,6 @@ Common optional values:
 
 - `OMADA_INSECURE_TLS`
   Default: `true`. Useful for local controllers with self-signed certificates. Use `false` only when your controller has a trusted TLS certificate.
-
-- `OMADA_USE_CLOUD_OPENAPI`
-  Default: `false`, except Vercel automatically uses cloud OpenAPI when `OMADA_CONTROLLER_URL` is a private LAN address. Set `true` to force cloud OpenAPI hosts.
-
-- `OMADA_CLOUD_REGION`
-  Cloud northbound region to use when `OMADA_USE_CLOUD_OPENAPI=true`. Supported values: `aps1`, `use1`, `euw1`, or `auto`. Default: `auto`.
-
-- `OMADA_CLOUD_CONTROLLER_URL`
-  Exact Interface Access Address from Omada Platform Integration. If set, this takes priority over `OMADA_CLOUD_REGION`.
 
 - `OMADA_SITE_ID` or `OMADA_SITE_NAME`
   Optional narrowing to one Omada site. If blank, the app uses the primary site or the first accessible site.
@@ -188,10 +173,11 @@ Common optional values:
 |   `-- HOTSPOT LOGO.png   # Logo and favicon source
 |-- test/
 |   |-- app-routes.test.js
+|   |-- config.test.js
 |   `-- frontend-traffic.test.js
 |-- .env.example
 |-- package.json
-|-- vercel.json
+|-- vercel.json          # Optional Vercel routing file; not needed for LAN-only OC200 setup
 `-- README.md
 ```
 
@@ -299,22 +285,22 @@ Run:
 npm test
 ```
 
-The current test suite focuses on frontend voucher timer and traffic display logic.
+The current test suite covers routing, local config behavior, and frontend voucher timer/traffic display logic.
 
 ## Troubleshooting
 
-Vercel refresh returns 404:
+Phone or same-Wi-Fi device cannot open the page:
 
-- Make sure `vercel.json` is included in the deployment.
-- Make sure `src/server.js` exports the Express app and only calls `listen()` when run locally.
-- Make sure the app fallback in `src/app.js` remains after the API routes.
+- Make sure the Node app is running with `npm start`.
+- Use `http://YOUR_SERVER_LAN_IP:3000`, not `http://localhost:3000`, from the phone.
+- Confirm the phone is on the same Wi-Fi/LAN as the server computer.
+- Confirm `.env` has `HOST=0.0.0.0`.
+- Allow Node.js or port `3000` in Windows Firewall.
 
-Vercel `/api/voucher-status` returns 502:
+API returns 502:
 
-- Check Vercel logs first. A 502 from this app usually means the server cannot reach Omada OpenAPI.
-- If `OMADA_CONTROLLER_URL` is `https://192.168.x.x`, set `OMADA_USE_CLOUD_OPENAPI=true` and `OMADA_CLOUD_REGION=aps1`, `use1`, or `euw1`.
-- Best option: copy the exact Interface Access Address from Omada Platform Integration and set it as `OMADA_CLOUD_CONTROLLER_URL`.
-- If Omada returns `-7131 Controller ID not exist`, copy the Omada ID from the same Open API app screen where you got the Interface Access Address. The local OC200 ID may not be valid on Omada cloud northbound hosts.
+- Make sure the server computer can open the OC200/controller address in `OMADA_CONTROLLER_URL`.
+- Make sure `OMADA_CONTROLLER_URL` points to the OC200 LAN OpenAPI address, for example `https://192.168.1.50:443`.
 - Confirm the Omada OpenAPI app is in client mode and has permission for sites, voucher groups, and client list.
 
 Configuration still needed:
